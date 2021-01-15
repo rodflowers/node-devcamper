@@ -30,6 +30,10 @@ const BootcampSchema = new mongoose.Schema({
       "Please add a valid email",
     ],
   },
+  address: {
+    type: String,
+    required: [true, 'Please add an address']
+  },
   location: {
     // GeoJSON Point
     type: {
@@ -90,11 +94,14 @@ const BootcampSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+}, {
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true }
 });
 
 // Create bootcamp slug from the name
 BootcampSchema.pre('save', function(next) {
-  this.slug = slugify(this.name, { lower:true });
+  this.slug = slugify(this.name, { lower: true });
   next();
 })
 
@@ -110,9 +117,25 @@ BootcampSchema.pre('save', async function(next) {
     state: loc[0].stateCode,
     zipcode: loc[0].zipcode,
     country: loc[0].countryCode
-  }
-   //DO not save adress in DB
+  };
+   // DO not save adress in DB
    this.address = undefined;
+   next();
+});
+
+// Cascade delete courses when a bootcamp is deleted
+BootcampSchema.pre('remove', async function(next) {
+  console.log(`Courses being deleted from bootcamp ${this._id}`.red);
+  await this.model('Course').deleteMany({ bootcamp: this._id });
+  next();
+});
+
+// Reverse populate whit virtuals
+BootcampSchema.virtual('courses', {
+  ref: 'Course',
+  localField: '_id',
+  foreignField: 'bootcamp',
+  justOne: false
 });
 
 module.exports = mongoose.model('Bootcamp', BootcampSchema);
